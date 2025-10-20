@@ -1,0 +1,7 @@
+INV-1001
+Date: 2025-09-18
+Vendor: ACME Corp
+1 x Widget @ 50.00 = 50.00
+Subtotal: 50.00
+Tax: 5.00
+Total: 55.00
