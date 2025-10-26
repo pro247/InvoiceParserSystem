@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<section class="card">
+    <h2>Dashboard</h2>
+
+    <div class="upload-area">
+        <label class="upload-box" id="uploadBox">
+            <input id="invoiceFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt" hidden>
+            <div id="uploadLabel">Click or drop file here</div>
+            <div id="filename" class="small muted"></div>
+        </label>
+
+        <div class="form-row">
+            <label for="exportSelect">Export format</label>
+            <select id="exportSelect">
+                <option value="csv">CSV</option>
+                <option value="xlsx">Excel (XLSX)</option>
+                <option value="gsheets">Google Sheets</option>
+            </select>
+            <button id="uploadBtn" class="btn primary">Process & Export</button>
+        </div>
+
+        <div id="uploadResult" class="msg"></div>
+    </div>
+
+    <hr />
+
+    <h3>Your Invoice History</h3>
+    <div id="historyContainer">
+        <table id="historyTable" class="striped" aria-live="polite">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Invoice #</th>
+                    <th>Vendor</th>
+                    <th>Date</th>
+                    <th>Export</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+        <div id="historyEmpty" class="muted">No invoices yet.</div>
+    </div>
+</section>
+{% endblock %}

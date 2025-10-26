@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<section class="card auth-card">
+    <h2>Create an account</h2>
+
+    <form id="signupForm" class="form">
+        <label for="signup-username">Username</label>
+        <input id="signup-username" name="username" placeholder="username" required>
+
+        <label for="signup-email">Email</label>
+        <input id="signup-email" type="email" name="email" placeholder="you@example.com" required>
+
+        <label for="signup-password">Password</label>
+        <input id="signup-password" type="password" name="password" placeholder="password" required>
+
+        <button type="submit" class="btn primary">Sign up</button>
+        <div id="signupMessage" class="msg"></div>
+    </form>
+</section>
+{% endblock %}

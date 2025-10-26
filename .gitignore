@@ -1,8 +1,27 @@
-venv/
-__pycache__/
-*.pyc
-.env
 credentials.json
 *.xlsx
 *.csv
 data/output/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+venv/
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/input/
+data/output/
+
+# Secrets
+service_account.json
