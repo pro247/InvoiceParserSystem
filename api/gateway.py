@@ -1,11 +1,11 @@
 # api/gateway.py
 from database.db_session import SessionLocal
-from models import Invoice
 
 import os
 import shutil
 import logging
 import json
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +36,7 @@ from api.auth import router as auth_router, get_current_user
 # Setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api.gateway")
+logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI(title="InvoiceParserSystem - API Gateway (Auth + Coral)")
 app.include_router(auth_router, prefix="/auth")
@@ -44,7 +45,7 @@ templates = Jinja2Templates(directory="templates")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for testing, later limit to ["http://127.0.0.1:8000"]
+    allow_origins=["*"],  # or restrict to ["http://127.0.0.1:8000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,6 +60,7 @@ ocr = OCRAgent()
 parser = ParserAgent()
 validator = ValidatorAgent()
 exporter = ExporterAgent(export_dir=str(OUTPUT_DIR))
+
 
 # ensure directories
 os.makedirs(UPLOAD_DIR, exist_ok=True)
