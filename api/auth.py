@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, model_validator
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
+
 
 # Local imports
 from database.db_session import get_db, SessionLocal
@@ -13,7 +14,8 @@ from database.models import User
 from settings import JWT_SECRET, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # Password encryption setup
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
 
 # Router for authentication endpoints
 router = APIRouter(tags=["auth"])
@@ -40,6 +42,14 @@ class SignInIn(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+@model_validator(mode="after")  # "before" if you want pre-processing
+def one_identifier(cls, values):
+    username, email = values.get("username"), values.get("email")
+    if not username and not email:
+        raise ValueError("Either username or email must be provided")
+    return values
 
 
 # ------------------------------

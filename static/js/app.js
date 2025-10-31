@@ -1,31 +1,30 @@
 // static/js/app.js
-// NOTE: module type; runs in all pages. Detects location and attaches handlers.
+const TOKEN_KEY = "invoice_token";
 
-const API_BASE = ""; // same origin
-
-// helper: get/set token
-export function getToken() {
-    return localStorage.getItem("invoice_token");
+// ---------------- Token Utilities ----------------
+function getToken() {
+    return localStorage.getItem(TOKEN_KEY);
 }
-export function setToken(t) {
-    localStorage.setItem("invoice_token", t);
+function setToken(t) {
+    localStorage.setItem(TOKEN_KEY, t);
     updateNav();
 }
-export function clearToken() {
-    localStorage.removeItem("invoice_token");
+function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
     updateNav();
 }
-
-// add Authorization header if token exists
-export function authHeaders() {
+function authHeaders() {
     const token = getToken();
     return token ? { "Authorization": `Bearer ${token}` } : {};
 }
 
+// ---------------- Navigation ----------------
 function updateNav() {
     const logout = document.getElementById("nav-logout");
     const dashboardLink = document.getElementById("nav-dashboard");
     const signupLink = document.getElementById("nav-signup");
+    if (!logout || !dashboardLink || !signupLink) return;
+
     if (getToken()) {
         logout.style.display = "inline";
         dashboardLink.style.display = "inline";
@@ -37,93 +36,141 @@ function updateNav() {
     }
 }
 
+// ---------------- Initialization ----------------
 window.addEventListener("load", () => {
     updateNav();
-    const path = location.pathname;
-    if (path === "/" || path.startsWith("/index")) {
-        initLogin();
-    } else if (path.startsWith("/signup")) {
-        initSignup();
-    } else if (path.startsWith("/dashboard")) {
-        initDashboard();
+
+    // Logout button
+    const logout = document.getElementById("nav-logout");
+    if (logout) {
+        logout.onclick = (e) => {
+            e.preventDefault();
+            clearToken();
+            location.href = "/";
+        };
     }
 
-    const logout = document.getElementById("nav-logout");
-    if (logout) logout.onclick = (e) => { e.preventDefault(); clearToken(); location.href = "/"; };
+    // Initialize pages based on presence of forms
+    if (document.getElementById("loginForm")) initLogin();
+    if (document.getElementById("signupForm")) initSignup();
+    if (document.getElementById("dashboardPage")) initDashboard(); // add id="dashboardPage" in dashboard HTML
 });
 
-// ----------------- Login -----------------
+// ---------------- Login ----------------
 function initLogin() {
     const form = document.getElementById("loginForm");
     if (!form) return;
-    form.onsubmit = async (e) => {
+
+    const loginBtn = document.getElementById("loginBtn");
+    const msg = document.getElementById("loginMessage");
+    const usernameInput = document.getElementById("login-username");
+    const passwordInput = document.getElementById("login-password");
+    if (!loginBtn || !msg || !usernameInput || !passwordInput) return;
+
+    loginBtn.onclick = async (e) => {
         e.preventDefault();
-        const ident = document.getElementById("login-username").value.trim();
-        const password = document.getElementById("login-password").value;
-        const payload = { password };
-        // decide if ident is email or username
-        if (ident.includes("@")) payload.email = ident;
-        else payload.username = ident;
+        msg.textContent = "";
 
-        const res = await fetch("/auth/signin", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+        const identifier = usernameInput.value.trim();
+        const password = passwordInput.value;
 
-        const msg = document.getElementById("loginMessage");
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: "Login failed" }));
-            msg.textContent = err.detail || "Login failed";
+        if (!identifier || !password) {
+            msg.textContent = "Enter credentials";
             msg.style.color = "red";
             return;
         }
-        const data = await res.json();
-        setToken(data.access_token);
-        msg.textContent = "Signed in";
-        msg.style.color = "green";
-        setTimeout(() => location.href = "/dashboard", 600);
+
+        // Always send JSON that matches FastAPI's model
+        const payload = {
+            password: password,
+            ...(identifier.includes("@") ? { email: identifier } : { username: identifier })
+        };
+
+        try {
+            const res = await fetch("/auth/signin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const body = await res.json().catch(() => ({ detail: "Invalid response" }));
+
+            if (!res.ok) {
+                msg.textContent = body.detail || JSON.stringify(body);
+                msg.style.color = "red";
+                return;
+            }
+
+            setToken(body.access_token);
+            msg.textContent = "Signed in — redirecting...";
+            msg.style.color = "green";
+            setTimeout(() => location.href = "/dashboard", 600);
+        } catch (err) {
+            msg.textContent = "Server error";
+            msg.style.color = "red";
+            console.error(err);
+        }
     };
 }
 
-// ----------------- Signup -----------------
+
+// ---------------- Signup ----------------
 function initSignup() {
     const form = document.getElementById("signupForm");
     if (!form) return;
-    form.onsubmit = async (e) => {
+
+    const btn = document.getElementById("signupBtn");
+    const msg = document.getElementById("signupMessage");
+    const usernameInput = document.getElementById("signup-username");
+    const emailInput = document.getElementById("signup-email");
+    const passwordInput = document.getElementById("signup-password");
+    if (!btn || !msg || !usernameInput || !emailInput || !passwordInput) return;
+
+    btn.onclick = async (e) => {
         e.preventDefault();
-        const username = document.getElementById("signup-username").value.trim();
-        const email = document.getElementById("signup-email").value.trim();
-        const password = document.getElementById("signup-password").value;
+        msg.textContent = "";
 
-        const res = await fetch("/auth/signup", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, email, password })
-        });
+        const username = usernameInput.value.trim();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
 
-        const msg = document.getElementById("signupMessage");
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: "Signup failed" }));
-            msg.textContent = err.detail || "Signup failed";
+        if (!username || !email || !password) {
+            msg.textContent = "Fill all fields";
             msg.style.color = "red";
             return;
         }
-        const data = await res.json();
-        // some backends return token in response
-        if (data.access_token) setToken(data.access_token);
-        msg.textContent = "Account created. Signing in...";
-        msg.style.color = "green";
-        setTimeout(() => location.href = "/dashboard", 700);
+
+        try {
+            const res = await fetch("/auth/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, email, password })
+            });
+
+            const body = await res.json().catch(() => ({ detail: "Invalid response" }));
+
+            if (!res.ok) {
+                msg.textContent = body.detail || JSON.stringify(body);
+                msg.style.color = "red";
+                return;
+            }
+
+            if (body.access_token) setToken(body.access_token);
+            msg.textContent = "Account created — redirecting...";
+            msg.style.color = "green";
+            setTimeout(() => location.href = "/dashboard", 700);
+        } catch (err) {
+            msg.textContent = "Signup failed";
+            msg.style.color = "red";
+            console.error(err);
+        }
     };
 }
 
-// ----------------- Dashboard -----------------
+// ---------------- Dashboard ----------------
 async function initDashboard() {
-    // redirect if no token
     if (!getToken()) { location.href = "/"; return; }
 
-    // UI elements
     const fileInput = document.getElementById("invoiceFile");
     const uploadBox = document.getElementById("uploadBox");
     const filename = document.getElementById("filename");
@@ -133,7 +180,9 @@ async function initDashboard() {
     const historyBody = document.getElementById("historyBody");
     const historyEmpty = document.getElementById("historyEmpty");
 
-    // drag/drop
+    if (!fileInput || !uploadBox || !filename || !uploadBtn || !exportSelect || !uploadResult || !historyBody || !historyEmpty) return;
+
+    // ---------- File Upload UI ----------
     uploadBox.addEventListener("click", () => fileInput.click());
     uploadBox.addEventListener("dragover", e => { e.preventDefault(); uploadBox.classList.add("drag"); });
     uploadBox.addEventListener("dragleave", e => { e.preventDefault(); uploadBox.classList.remove("drag"); });
@@ -145,89 +194,103 @@ async function initDashboard() {
             filename.textContent = fileInput.files[0].name;
         }
     });
-
-    fileInput.addEventListener("change", () => {
-        filename.textContent = fileInput.files[0]?.name || "";
-    });
+    fileInput.addEventListener("change", () => { filename.textContent = fileInput.files[0]?.name || ""; });
 
     uploadBtn.onclick = async () => {
-        if (!fileInput.files.length) { uploadResult.textContent = "Please select a file."; uploadResult.style.color = "red"; return; }
+        if (!fileInput.files.length) { uploadResult.textContent = "Please select file"; uploadResult.style.color = "red"; return; }
         uploadResult.textContent = "Processing..."; uploadResult.style.color = "black";
+
         const fd = new FormData();
         fd.append("file", fileInput.files[0]);
         fd.append("export_format", exportSelect.value);
 
-        const res = await fetch("/process_invoice", {
-            method: "POST",
-            headers: authHeaders(),
-            body: fd
-        });
+        try {
+            const res = await fetch("/process_invoice", {
+                method: "POST",
+                headers: authHeaders(),
+                body: fd
+            });
+            const body = await res.json().catch(() => ({ detail: "Invalid response" }));
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-            uploadResult.textContent = err.detail || JSON.stringify(err);
-            uploadResult.style.color = "red";
+            if (!res.ok) {
+                uploadResult.textContent = body.detail || JSON.stringify(body);
+                uploadResult.style.color = "red";
+                await loadHistory();
+                return;
+            }
+
+            uploadResult.textContent = "Done: " + (body.export?.file || body.export?.url || JSON.stringify(body));
+            uploadResult.style.color = "green";
             await loadHistory();
-            return;
+        } catch (err) {
+            uploadResult.textContent = "Upload error";
+            uploadResult.style.color = "red";
+            console.error(err);
         }
-        const data = await res.json();
-        uploadResult.textContent = "Done. " + (data.export?.file || data.export?.url || JSON.stringify(data));
-        uploadResult.style.color = "green";
-        await loadHistory();
     };
 
-    // load history
+    // ---------- Load History ----------
     async function loadHistory() {
         historyBody.innerHTML = "";
         historyEmpty.style.display = "none";
-        const res = await fetch("/invoices", { headers: authHeaders() });
-        if (!res.ok) { historyEmpty.textContent = "Failed to load history."; historyEmpty.style.display = "block"; return; }
-        const data = await res.json();
-        const invoices = data.invoices || data;
-        if (!invoices || invoices.length === 0) {
+        try {
+            const res = await fetch("/invoices", { headers: { ...authHeaders(), "Accept": "application/json" } });
+            if (!res.ok) {
+                historyEmpty.textContent = "Failed to load history.";
+                historyEmpty.style.display = "block";
+                return;
+            }
+
+            const data = await res.json();
+            const invoices = data.invoices || data;
+
+            if (!invoices || invoices.length === 0) {
+                historyEmpty.style.display = "block";
+                return;
+            }
+
+            for (const inv of invoices) {
+                const tr = document.createElement("tr");
+                const exportInfo = inv.export || inv.exports?.slice(-1)?.[0] || {};
+                const exportPath = exportInfo.path || exportInfo.export_path || exportInfo.url || null;
+                const exportFormat = exportInfo.format || exportInfo.export_format || "";
+
+                const actionsTd = document.createElement("td");
+
+                if (exportFormat && exportFormat !== "gsheets" && exportPath) {
+                    const a = document.createElement("a");
+                    a.href = exportPath.startsWith("http") ? exportPath : `/download/${exportInfo.id}`;
+                    a.textContent = "Download";
+                    a.className = "btn";
+                    a.style.marginRight = "6px";
+                    actionsTd.appendChild(a);
+                }
+
+                if (exportFormat === "gsheets" && exportPath) {
+                    const a2 = document.createElement("a");
+                    a2.href = exportPath;
+                    a2.target = "_blank";
+                    a2.textContent = "Open Sheet";
+                    a2.className = "btn";
+                    actionsTd.appendChild(a2);
+                }
+
+                tr.innerHTML = `
+                    <td>${inv.invoice_id ?? inv.id ?? ""}</td>
+                    <td>${(inv.normalized && JSON.parse(inv.normalized).invoice_number) || inv.invoice_number || ""}</td>
+                    <td>${(inv.normalized && JSON.parse(inv.normalized).vendor) || inv.vendor || ""}</td>
+                    <td>${(inv.normalized && JSON.parse(inv.normalized).date) || inv.date || ""}</td>
+                    <td>${exportFormat || ""}</td>
+                `;
+                tr.appendChild(actionsTd);
+                historyBody.appendChild(tr);
+            }
+        } catch (err) {
+            historyEmpty.textContent = "Error loading history";
             historyEmpty.style.display = "block";
-            return;
-        }
-        historyEmpty.style.display = "none";
-        for (const inv of invoices) {
-            const tr = document.createElement("tr");
-            const exportInfo = inv.export || inv.exports?.slice(-1)?.[0] || {};
-            const exportId = exportInfo.id || (exportInfo.path ? null : null);
-            const exportPath = exportInfo.path || exportInfo.export_path || exportInfo.path || exportInfo.url || null;
-            const exportFormat = exportInfo.format || exportInfo.export_format || "";
-
-            const actionsTd = document.createElement("td");
-            // download button (local)
-            if (exportFormat && exportFormat !== "gsheets" && exportPath) {
-                const a = document.createElement("a");
-                a.href = `/download/${exportInfo.id}`;
-                a.textContent = "Download";
-                a.className = "btn";
-                a.onclick = (e) => { /* default link will ask for token at server side */ };
-                actionsTd.appendChild(a);
-            }
-            // google sheets open
-            if (exportFormat === "gsheets" && exportPath) {
-                const a2 = document.createElement("a");
-                a2.href = exportPath;
-                a2.target = "_blank";
-                a2.textContent = "Open Sheet";
-                a2.className = "btn";
-                actionsTd.appendChild(a2);
-            }
-
-            tr.innerHTML = `
-        <td>${inv.invoice_id ?? inv.id ?? ""}</td>
-        <td>${inv.invoice_number ?? (inv.data && inv.data.invoice_number) || ""}</td>
-        <td>${inv.vendor ?? (inv.data && inv.data.vendor) || ""}</td>
-        <td>${inv.date ?? (inv.data && inv.data.date) || ""}</td>
-        <td>${exportFormat || (exportInfo.format || "")}</td>
-      `;
-            tr.appendChild(actionsTd);
-            historyBody.appendChild(tr);
+            console.error(err);
         }
     }
 
-    // initial load
     await loadHistory();
 }
